@@ -1,0 +1,10 @@
+langchain==0.3.27
+langchain-core==0.3.76
+langchain-openai==0.3.33
+langsmith==0.4.31
+python-dotenv==1.0.1
+psycopg2-binary==2.9.10
+pandas==2.3.2
+openpyxl==3.1.5
+matplotlib==3.10.6
+streamlit==1.50.0
