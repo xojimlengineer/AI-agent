@@ -1,66 +1,48 @@
-import streamlit as st
 import os
-import pandas as pd
+import streamlit as st
+from langchain_core.messages import HumanMessage
 from ai_agent import rag_agent
+
+st.set_page_config(page_title="Bank DB Analyst", page_icon="📊", layout="wide")
 st.title("Data Analyst Agent (Bank DB)")
 
-query = st.text_input("Savolingizni yozing:")
+q = st.text_input("Savolingizni yozing:")
+go = st.button("Javob")
 
-if st.button("Javob"):
-    if query.strip():
-        result = rag_agent.invoke({
-            "input": query,
-            "chat_history": []
-        })
-        print("result:", result)
+def run_agent(prompt: str):
+    return rag_agent.invoke({"messages": [HumanMessage(content=prompt)]})
 
-        #SQL preview
-        st.subheader("Generated SQL")
-        if "intermediate_steps" in result and result["intermediate_steps"]:
+if go:
+    if not q.strip():
+        st.error("Savol kiriting.")
+    else:
+        with st.spinner("Hisoblayapman..."):
             try:
-                sql_text = result["intermediate_steps"][0][0].tool_input
-                st.code(sql_text, language="sql")
+                result = run_agent(q.strip())
             except Exception as e:
-                st.warning(f"SQL previewda muammo: {e}")
+                st.error(f"Xatolik: {e}")
+                st.stop()
 
-                # Agar output to‘g‘ridan tool natijasi bo‘lmasa, intermediate_steps ichidan chiqaramiz
-                output = None
-                if "output" in result and isinstance(result["output"], dict):
-                    output = result["output"]
-                elif "intermediate_steps" in result and result["intermediate_steps"]:
-                    # oxirgi tool natijasini olamiz
-                    try:
-                        last_step = result["intermediate_steps"][-1][-1]
-                        if isinstance(last_step, dict):
-                            output = last_step
-                    except Exception as e:
-                        st.error(f"Natijani qayta ishlashda xato: {e}")
+        file_given = False
+        outbox = result.get("outbox") or []
+        for item in outbox:
+            path = item.get("path")
+            if path and os.path.exists(path):
+                with open(path, "rb") as f:
+                    st.download_button(
+                        "📥 Excelni yuklab olish",
+                        data=f.read(),
+                        file_name=os.path.basename(path),
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
+                file_given = True
+                break
 
-                # Excel faylni yuklab olish
-                if "_file" in output:
-                    file_path = output["_file"]["path"]
-                    if os.path.exists(file_path):
-                        with open(file_path, "rb") as f:
-                            st.download_button(
-                                label="📥 Excelni yuklab olish",
-                                data=f.read(),
-                                file_name=os.path.basename(file_path),
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
-                    else:
-                        st.warning("⚠️ Excel fayl topilmadi.")
-            else:
-                st.warning("⚠️ Tool kutilgan formatda natija qaytarmadi.")
-
-        # Default fallback: har doim oxirgi result.xlsx faylni berish
-        if os.path.exists("result.xlsx"):
+        if not file_given and os.path.exists("result.xlsx"):
             with open("result.xlsx", "rb") as f:
                 st.download_button(
-                    label="📥 Excelni yuklab olish",
+                    "📥 Excelni yuklab olish",
                     data=f.read(),
                     file_name="result.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
-    else:
-        st.error("Savol yozing.")
-
